@@ -139,8 +139,13 @@ class SlowDummyObjectDetector(AbstractClassifierUDF):
     def labels(self):
         return ['__background__', 'person', 'bicycle']
 
-    def classify(self, frames: np.ndarray):
-        time.sleep(5)
-        labels = [self.labels[i % 2 + 1] for i in range(len(frames))]
-        prediction_df_list = pd.DataFrame({'label': labels})
-        return prediction_df_list
+    def classify(self, df: pd.DataFrame):
+        ret = pd.DataFrame()
+        ret['label'] = df.apply(self.classify_one, axis = 1)
+        return ret
+
+    def classify_one(self, frames: np.ndarray):
+        #time.sleep(5)
+        i = int(frames[0][0][0][0] * 10 / 2 / 255) - 1
+        label = self.labels[i % 2 + 1]
+        return label

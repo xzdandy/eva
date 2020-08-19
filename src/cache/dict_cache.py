@@ -80,6 +80,7 @@ class DictCache(AbstractCache):
 
         return (False, None)
 
+
     def execute(self, func: Callable, args: pd.DataFrame) -> pd.DataFrame:
         """
             Notice: args can be a dataframe with mutiple rows.
