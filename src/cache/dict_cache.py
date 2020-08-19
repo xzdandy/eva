@@ -31,6 +31,7 @@ class DictCache(AbstractCache):
 
     def _hash_args(self, args):
         # No good hash function for panda DataFrame?
+        # We should use table id as unique key
         argshash = hashlib.md5(args.to_csv().encode('utf-8')).hexdigest()
 
     def put(self, func: Callable, args: pd.DataFrame, retval: pd.DataFrame) -> bool:
@@ -78,3 +79,29 @@ class DictCache(AbstractCache):
                 return (True, output)
 
         return (False, None)
+
+    def execute(self, func: Callable, args: pd.DataFrame) -> pd.DataFrame:
+        """
+            Notice: args can be a dataframe with mutiple rows.
+            Run with row by row?
+        """
+        try:
+            fname = func.__name__
+        except:
+            LoggingManager.log("Unable to acquire function name.")
+            return func(args)
+
+        argshash = self._hash_args(args)
+        if fname in self.cache and argshash in self.cache[fname]:
+            for input, output in self.cache[fname][argshash]:
+                if args.equals(input):
+                    return output
+
+        # No hit
+        retval = func(args)
+        if fname not in self.cache:
+            self.cache[fname] = {}
+        if argshash not in self.cache[fname]:
+            self.cache[fname][argshash] = []
+        self.cache[fname][argshash].append((args, retval))
+        return retval

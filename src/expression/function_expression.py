@@ -104,10 +104,7 @@ class FunctionExpression(AbstractExpression):
 
         func = self._gpu_enabled_function()
         func.__name__ = self.name
-        hit, outcomes = Cache.get(func, new_batch.frames)
-        if not hit:
-            outcomes = pd.DataFrame(func(new_batch.frames))
-            Cache.put(func, new_batch.frames, outcomes)
+        outcomes = Cache.execute(func, new_batch.frames)
         outcomes = Batch(outcomes)
 
         if self._output:

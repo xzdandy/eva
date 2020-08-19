@@ -33,3 +33,9 @@ class AbstractCache(metaclass=ABCMeta):
             Returns a boolean indicating whether the miss or hit
             and the output of the function if hit.
         """
+
+    @abstractmethod
+    def execute(self, func: Callable, args: pd.DataFrame) -> pd.DataFrame:
+        """
+            Execute the function with cache.
+        """
