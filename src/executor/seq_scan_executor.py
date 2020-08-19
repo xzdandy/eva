@@ -42,13 +42,13 @@ class SequentialScanExecutor(AbstractExecutor):
             # We do the predicate first
             if self.predicate is not None:
                 outcomes = self.predicate.evaluate(batch).frames
-                required_frame_ids = outcomes.index[outcomes[0]].tolist()
-                batch = batch[required_frame_ids]
+                batch = Batch(
+                    batch.frames[(outcomes > 0).to_numpy()].reset_index(
+                        drop=True))
 
             # Then do project
-            if self.project_expr is not None:
+            if not batch.empty() and self.project_expr is not None:
                 batches = [expr.evaluate(batch) for expr in self.project_expr]
-                yield Batch.merge_column_wise(batches)
-            else:
-                # Is this expected behavior? No projection = * 
-                yield batch
+                batch = Batch.merge_column_wise(batches)
+
+            yield batch

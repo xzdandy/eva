@@ -21,7 +21,9 @@ from src.executor.execution_context import Context
 from src.expression.abstract_expression import AbstractExpression, \
     ExpressionType
 from src.models.storage.batch import Batch
+from src.cache import Cache
 from src.udfs.gpu_compatible import GPUCompatible
+from src.catalog.models.udf_io import UdfIO
 
 
 @unique
@@ -47,45 +49,75 @@ class FunctionExpression(AbstractExpression):
         is_temp (bool, default:False): In case of EXEC type, decides if the
         outcome needs to be stored in BatchFrame temporarily.
 
+        output(str): The column to return after executing function
+
+        output_obj(UdfIO): The catalog object corresponding to the func_output.
+        To be populated by optimizer.
+
     """
 
     def __init__(self, func: Callable,
                  mode: ExecutionMode = ExecutionMode.EVAL, name=None,
-                 is_temp: bool = False,
+                 is_temp: bool = False, output=None,
                  **kwargs):
         if mode == ExecutionMode.EXEC:
             assert name is not None
 
         super().__init__(ExpressionType.FUNCTION_EXPRESSION, **kwargs)
         self._context = Context()
-        self.mode = mode
-        self.name = name
-        self.function = func
-        self.is_temp = is_temp
+        self._mode = mode
+        self._name = name
+        self._function = func
+        self._is_temp = is_temp
+        self._output = output
+        self._output_obj = None
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def output(self):
+        return self._output
+
+    @property
+    def output_obj(self):
+        return self._output_obj
+
+    @output_obj.setter
+    def output_obj(self, val: UdfIO):
+        self._output_obj = val
+
+    @property
+    def function(self):
+        return self._function
+
+    @function.setter
+    def function(self, func: Callable):
+        self._function = func
 
     def evaluate(self, batch: Batch):
-        if self.get_children_count() > 0:
-            child = self.get_child(0)
-            args = child.evaluate(batch).frames
-        else:
-            args = batch.frames
-        func = self._gpu_enabled_function()
+        new_batch = batch
+        child_batches = [child.evaluate(batch) for child in self.children]
+        if len(child_batches):
+            new_batch = Batch.merge_column_wise(child_batches)
 
-        if args is None or args.empty:
-            outcomes = func()
-            frames = outcomes[0].data
+        func = self._gpu_enabled_function()
+        func.__name__ = self.name
+        hit, outcomes = Cache.get(func, new_batch.frames)
+        if not hit:
+            outcomes = pd.DataFrame(func(new_batch.frames))
+            Cache.put(func, new_batch.frames, outcomes)
+        outcomes = Batch(outcomes)
+
+        if self._output:
+            return outcomes.project([self._output])
         else:
-            frames = pd.DataFrame()
-            for arg in args.to_numpy():
-                outcomes = func(*arg)
-                # We only consider outcomes size 1 here
-                frames = frames.append(outcomes[0].data, ignore_index=True)
-        new_batch = Batch(frames=frames)
-        return new_batch
+            return outcomes
 
     def _gpu_enabled_function(self):
-        if isinstance(self.function, GPUCompatible):
+        if isinstance(self._function, GPUCompatible):
             device = self._context.gpu_device()
             if device != NO_GPU:
-                return self.function.to_device(device)
-        return self.function
+                return self._function.to_device(device)
+        return self._function

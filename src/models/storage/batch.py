@@ -16,7 +16,6 @@ import numpy as np
 import pandas as pd
 
 from typing import List
-from collections import defaultdict
 from pandas import DataFrame
 from src.models.inference.outcome import Outcome
 from src.utils.logging_manager import LoggingManager, LoggingLevel
@@ -35,7 +34,10 @@ class Batch:
 
     """
 
-    def __init__(self, frames, outcomes=None, temp_outcomes=None,
+    def __init__(self,
+                 frames=pd.DataFrame(),
+                 outcomes=None,
+                 temp_outcomes=None,
                  identifier_column='id'):
         super().__init__()
         if outcomes is None:
@@ -61,6 +63,9 @@ class Batch:
 
     @property
     def batch_size(self):
+        return self._batch_size
+
+    def __len__(self):
         return self._batch_size
 
     @property
@@ -177,24 +182,29 @@ class Batch:
         return Batch(self._frames[verfied_cols], self._outcomes.copy(),
                      self._temp_outcomes.copy(), self._identifier_column)
 
-
     @classmethod
-    def merge_column_wise(cls, batches: ['Batch'], auto_renaming = False) \
-            -> 'Batch':
+    def merge_column_wise(cls,
+                          batches: ['Batch'],
+                          auto_renaming=False) -> 'Batch':
         """
-        Merge two batch frames column_wise and return a new batch frame
+        Merge list of batch frames column_wise and return a new batch frame
         No outcome merge. Add later when there is a actual usage.
         Arguments:
-            other (Batch): other framebatch to add
+            batches: List[Batch]: lsit of batch objects to be merged
+            auto_renaming: if true rename column names if required
 
         Returns:
-            Batch
+            Batch: Merged batch object
         """
+
+        if not len(batches):
+            return Batch()
         frames = [batch.frames for batch in batches]
-        new_frames = pd.concat(frames, axis=1)
+        new_frames = pd.concat(frames, axis=1, copy=False)
         if new_frames.columns.duplicated().any():
-            LoggingManager().log("Duplicated column name detected %s" % new_frames,
-                                 LoggingLevel.WARNING)
+            LoggingManager().log(
+                'Duplicated column name detected {}'.format(new_frames),
+                LoggingLevel.WARNING)
         return Batch(new_frames)
 
     def __add__(self, other: 'Batch'):
