@@ -31,15 +31,10 @@ class UDFCacheTest(unittest.TestCase):
         CatalogManager().reset()
         create_sample_video(NUM_FRAMES)
 
-    def tearDown(self):
-        os.remove('dummy.avi')
-
-    # integration test
-    def test_should_use_udf_cache(self):
         load_query = """LOAD DATA INFILE 'dummy.avi' INTO MyVideo;"""
         perform_query(load_query)
 
-        create_udf_query = """CREATE UDF SlowDummyObjectDetector
+        create_udf_query = """CREATE UDF DummyLabelDetector
                   INPUT  (Frame_Array NDARRAY (3, 256, 256))
                   OUTPUT (label TEXT(10))
                   TYPE  Classification
@@ -47,24 +42,100 @@ class UDFCacheTest(unittest.TestCase):
         """
         perform_query(create_udf_query)
 
-        select_query = "SELECT id,SlowDummyObjectDetector(data) FROM MyVideo;"
-        start_time = time.time()
-        actual_batch = perform_query(select_query)
-        end_time = time.time()
-        print("SlowDummyObjectDetector costs %.2f seconds" % (end_time - start_time))
-        labels = DummyObjectDetector().labels
-        expected = [{'id': i, 'label': labels[1 + i % 2]}
-                    for i in range(NUM_FRAMES)]
-        expected_batch = Batch(frames=pd.DataFrame(expected))
-        self.assertTrue(actual_batch, expected_batch)
+        create_udf_query = """CREATE UDF DummyColorDetector
+                  INPUT  (Frame_Array NDARRAY (3, 256, 256))
+                  OUTPUT (color TEXT(10))
+                  TYPE  Classification
+                  IMPL  'test/util.py';
+        """
+        perform_query(create_udf_query)
 
-        select_query = "SELECT id,SlowDummyObjectDetector(data) FROM MyVideo;"
+    def tearDown(self):
+        os.remove('dummy.avi')
+
+    def perform_query_with_time(self, query):
         start_time = time.time()
-        actual_batch = perform_query(select_query)
+        actual_batch = perform_query(query)
         end_time = time.time()
-        print("SlowDummyObjectDetector costs %.2f seconds" % (end_time - start_time))
+        print("%s costs %.2f seconds" % (query, (end_time - start_time)))
+        return actual_batch
+
+    # integration test
+    def test_should_use_udf_cache_identical_query(self):
+        query = "SELECT id,DummyLabelDetector(data) FROM MyVideo;"
+        actual_batch = self.perform_query_with_time(query)
+
         labels = DummyObjectDetector().labels
-        expected = [{'id': i, 'label': labels[1 + i % 2]}
+        expected = [{'id': i, 'label': labels[i % 3]}
                     for i in range(NUM_FRAMES)]
         expected_batch = Batch(frames=pd.DataFrame(expected))
-        self.assertTrue(actual_batch, expected_batch)
+        actual_batch.sort()
+        self.assertEqual(actual_batch, expected_batch)
+
+        actual_batch = self.perform_query_with_time(query)
+        actual_batch.sort()
+        self.assertEqual(actual_batch, expected_batch)
+
+    # integration test
+    def test_should_use_udf_cache_subsume_query(self):
+        query = "SELECT id,DummyLabelDetector(data) FROM MyVideo\
+                 WHERE id < 5;"
+        actual_batch = self.perform_query_with_time(query)
+
+        labels = DummyObjectDetector().labels
+        expected = [{'id': i, 'label': labels[i % 3]}
+                    for i in range(5)]
+        expected_batch = Batch(frames=pd.DataFrame(expected))
+        actual_batch.sort()
+        self.assertEqual(actual_batch, expected_batch)
+
+        full_query = "SELECT id,DummyLabelDetector(data) FROM MyVideo;"
+        actual_batch = self.perform_query_with_time(full_query)
+        actual_batch.sort()
+        expected = [{'id': i, 'label': labels[i % 3]}
+                    for i in range(NUM_FRAMES)]
+        expected_batch = Batch(frames=pd.DataFrame(expected))
+        self.assertEqual(actual_batch, expected_batch)
+
+    # integration test
+    def test_should_use_udf_cache_merge_full_query(self):
+        query = "SELECT id,DummyLabelDetector(data) FROM MyVideo\
+                 WHERE id < 5;"
+        actual_batch = self.perform_query_with_time(query)
+
+        labels = DummyObjectDetector().labels
+        expected = [{'id': i, 'label': labels[i % 3]}
+                    for i in range(5)]
+        expected_batch = Batch(frames=pd.DataFrame(expected))
+        actual_batch.sort()
+        self.assertEqual(actual_batch, expected_batch)
+
+        query = "SELECT id,DummyLabelDetector(data) FROM MyVideo\
+                 WHERE id >= 5;"
+        actual_batch = self.perform_query_with_time(query)
+        actual_batch.sort()
+        expected = [{'id': i, 'label': labels[i % 3]}
+                    for i in range(5, NUM_FRAMES)]
+        expected_batch = Batch(frames=pd.DataFrame(expected))
+        self.assertEqual(actual_batch, expected_batch)
+
+        full_query = "SELECT id,DummyLabelDetector(data) FROM MyVideo;"
+        actual_batch = self.perform_query_with_time(full_query)
+        actual_batch.sort()
+        expected = [{'id': i, 'label': labels[i % 3]}
+                    for i in range(NUM_FRAMES)]
+        expected_batch = Batch(frames=pd.DataFrame(expected))
+        self.assertEqual(actual_batch, expected_batch)
+
+    # integration test
+    def test_should_use_udf_cache_udf_predicate_query(self):
+        query = "SELECT id,DummyColorDetector(data) FROM MyVideo\
+                 WHERE DummyLabelDetector(data).label = 'person';"
+        actual_batch = self.perform_query_with_time(query)
+
+        query = "SELECT id,DummyColorDetector(data) FROM MyVideo\
+                 WHERE DummyLabelDetector(data).label = 'bicycle';"
+        actual_batch = self.perform_query_with_time(query)
+
+        query = "SELECT id,DummyColorDetector(data) FROM MyVideo;"
+        actual_batch = self.perform_query_with_time(query)

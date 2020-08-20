@@ -75,6 +75,12 @@ class Batch:
     def column_as_numpy_array(self, column_name='data'):
         return np.array(self._frames[column_name])
 
+    def sort(self):
+        if self.identifier_column in self.frames:
+            self._frames = self._frames.sort_values(
+                by=[self.identifier_column],
+                ignore_index=True)
+
     def __str__(self):
         """
         For debug propose
@@ -223,7 +229,7 @@ class Batch:
         if not isinstance(other, Batch):
             raise TypeError("Input should be of type Batch")
 
-        new_frames = self.frames.append(other.frames)
+        new_frames = self.frames.append(other.frames, ignore_index=True)
         new_outcomes = {}
         temp_new_outcomes = {}
 
