@@ -20,7 +20,7 @@ import pandas as pd
 from src.catalog.catalog_manager import CatalogManager
 from src.models.storage.batch import Batch
 from test.util import create_sample_video, perform_query
-from test.util import DummyObjectDetector
+from test.util import DummyLabelDetector, DummyColorDetector
 
 NUM_FRAMES = 10
 
@@ -65,7 +65,7 @@ class UDFCacheTest(unittest.TestCase):
         query = "SELECT id,DummyLabelDetector(data) FROM MyVideo;"
         actual_batch = self.perform_query_with_time(query)
 
-        labels = DummyObjectDetector().labels
+        labels = DummyLabelDetector().labels
         expected = [{'id': i, 'label': labels[i % 3]}
                     for i in range(NUM_FRAMES)]
         expected_batch = Batch(frames=pd.DataFrame(expected))
@@ -82,7 +82,7 @@ class UDFCacheTest(unittest.TestCase):
                  WHERE id < 5;"
         actual_batch = self.perform_query_with_time(query)
 
-        labels = DummyObjectDetector().labels
+        labels = DummyLabelDetector().labels
         expected = [{'id': i, 'label': labels[i % 3]}
                     for i in range(5)]
         expected_batch = Batch(frames=pd.DataFrame(expected))
@@ -103,7 +103,7 @@ class UDFCacheTest(unittest.TestCase):
                  WHERE id < 5;"
         actual_batch = self.perform_query_with_time(query)
 
-        labels = DummyObjectDetector().labels
+        labels = DummyLabelDetector().labels
         expected = [{'id': i, 'label': labels[i % 3]}
                     for i in range(5)]
         expected_batch = Batch(frames=pd.DataFrame(expected))
@@ -127,15 +127,42 @@ class UDFCacheTest(unittest.TestCase):
         expected_batch = Batch(frames=pd.DataFrame(expected))
         self.assertEqual(actual_batch, expected_batch)
 
+    def color_helper(self, i):
+        labels = DummyColorDetector().labels
+        if i < 3:
+            label = labels[0]
+        elif i < 6:
+            label = labels[1]
+        else:
+            label = labels[2]
+        return label
+
     # integration test
     def test_should_use_udf_cache_udf_predicate_query(self):
+
         query = "SELECT id,DummyColorDetector(data) FROM MyVideo\
                  WHERE DummyLabelDetector(data).label = 'person';"
         actual_batch = self.perform_query_with_time(query)
+        actual_batch.sort()
+        expected = [{'id': i, 'color': self.color_helper(i)}
+                    for i in range(NUM_FRAMES) if i % 3 == 1]
+        expected_batch = Batch(frames=pd.DataFrame(expected))
+        self.assertEqual(actual_batch, expected_batch)
+
 
         query = "SELECT id,DummyColorDetector(data) FROM MyVideo\
                  WHERE DummyLabelDetector(data).label = 'bicycle';"
         actual_batch = self.perform_query_with_time(query)
+        actual_batch.sort()
+        expected = [{'id': i, 'color': self.color_helper(i)}
+                    for i in range(NUM_FRAMES) if i % 3 == 2]
+        expected_batch = Batch(frames=pd.DataFrame(expected))
+        self.assertEqual(actual_batch, expected_batch)
 
         query = "SELECT id,DummyColorDetector(data) FROM MyVideo;"
         actual_batch = self.perform_query_with_time(query)
+        actual_batch.sort()
+        expected = [{'id': i, 'color': self.color_helper(i)}
+                    for i in range(NUM_FRAMES)]
+        expected_batch = Batch(frames=pd.DataFrame(expected))
+        self.assertEqual(actual_batch, expected_batch)
