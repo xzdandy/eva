@@ -21,6 +21,7 @@ from src.catalog.catalog_manager import CatalogManager
 from src.models.storage.batch import Batch
 from test.util import create_sample_video, perform_query
 from test.util import DummyLabelDetector, DummyColorDetector
+from src.cache import Cache
 
 NUM_FRAMES = 10
 
@@ -62,6 +63,7 @@ class UDFCacheTest(unittest.TestCase):
 
     # integration test
     def test_should_use_udf_cache_identical_query(self):
+        Cache.drop()
         query = "SELECT id,DummyLabelDetector(data) FROM MyVideo;"
         actual_batch = self.perform_query_with_time(query)
 
@@ -78,6 +80,7 @@ class UDFCacheTest(unittest.TestCase):
 
     # integration test
     def test_should_use_udf_cache_subsume_query(self):
+        Cache.drop()
         query = "SELECT id,DummyLabelDetector(data) FROM MyVideo\
                  WHERE id < 5;"
         actual_batch = self.perform_query_with_time(query)
@@ -99,6 +102,7 @@ class UDFCacheTest(unittest.TestCase):
 
     # integration test
     def test_should_use_udf_cache_merge_full_query(self):
+        Cache.drop()
         query = "SELECT id,DummyLabelDetector(data) FROM MyVideo\
                  WHERE id < 5;"
         actual_batch = self.perform_query_with_time(query)
@@ -139,7 +143,7 @@ class UDFCacheTest(unittest.TestCase):
 
     # integration test
     def test_should_use_udf_cache_udf_predicate_query(self):
-
+        Cache.drop()
         query = "SELECT id,DummyColorDetector(data) FROM MyVideo\
                  WHERE DummyLabelDetector(data).label = 'person';"
         actual_batch = self.perform_query_with_time(query)

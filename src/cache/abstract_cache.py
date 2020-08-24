@@ -21,21 +21,13 @@ from abc import ABCMeta, abstractmethod
 class AbstractCache(metaclass=ABCMeta):
 
     @abstractmethod
-    def put(self, func: Callable, args: pd.DataFrame, retval: pd.DataFrame) -> bool:
-        """
-            Update the cache with this function call
-        """
-
-    @abstractmethod
-    def get(self, func: Callable, args: pd.DataFrame) -> (bool, pd.DataFrame):
-        """
-            Look for the function in the cache.
-            Returns a boolean indicating whether the miss or hit
-            and the output of the function if hit.
-        """
-
-    @abstractmethod
     def execute(self, func: Callable, args: pd.DataFrame) -> pd.DataFrame:
         """
             Execute the function with cache.
+        """
+
+    @abstractmethod
+    def drop(self):
+        """
+            Drop all existing cache content.
         """

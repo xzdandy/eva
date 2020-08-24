@@ -27,59 +27,28 @@ class DictCache(AbstractCache):
     In memory cache based on Dictionary. For testing purpose only.
     """
     def __init__(self):
-        self.cache = {}
+        self.batchcache = {}
+        self.rowcache = {}
 
     def _hash_args(self, args):
         # No good hash function for panda DataFrame?
         # We should use table id as unique key
-        argshash = hashlib.md5(args.to_csv().encode('utf-8')).hexdigest()
+        # Drop index
+        argshash = hashlib.md5(args.to_csv(index=False).encode('utf-8')).hexdigest()
 
-    def put(self, func: Callable, args: pd.DataFrame, retval: pd.DataFrame) -> bool:
-        fname = func.__name__
-        if fname not in self.cache:
-            self.cache[fname] = {}
-        # pandas.util.hash_pandas_object does not work on internal numpy array.
-        argshash = self._hash_args(args)
-        if argshash not in self.cache[fname]:
-            self.cache[fname][argshash] = []
+    def _add(self, cache, fname, argshash, input, output):
+        if fname not in cache:
+            cache[fname] = {}
+        if argshash not in cache[fname]:
+            cache[fname][argshash] = []
+        cache[fname][argshash].append((input, output))
 
-        for input, output in self.cache[fname][argshash]:
-            if args.equals(input):
-                if retval.equals(output):
-                    LoggingManager().log("Exact funtion call has been cached.\n\
-                                         Function: %s\n\
-                                         Args: %s" % (fname, args),
-                                         LoggingLevel.WARNING)
-                    return True
-                else:
-                    LoggingManager().log("Exact funtion call has been cached\
-                                         (but different output).\n\
-                                         Function: %s\n\
-                                         Args: %s\n\
-                                         Old: %s\n\
-                                         New: %s"
-                                         % (fname, args, output, retval),
-                                         LoggingLevel.WARNING)
-                    return False
-
-        self.cache[fname][argshash].append((args, retval))
-        return True
-
-
-    def get(self, func: Callable, args: pd.DataFrame) -> (bool, pd.DataFrame):
-        fname = func.__name__
-        if fname not in self.cache:
-            return (False, None)
-        argshash = self._hash_args(args)
-        if argshash not in self.cache[fname]:
-            return (False, None)
-
-        for input, output in self.cache[fname][argshash]:
-            if args.equals(input):
-                return (True, output)
-
+    def _check(self, cache, fname, argshash, args):
+        if fname in cache and argshash in cache[fname]:
+            for input, output in cache[fname][argshash]:
+                if args.equals(input):
+                    return (True, output)
         return (False, None)
-
 
     def execute(self, func: Callable, args: pd.DataFrame) -> pd.DataFrame:
         """
@@ -89,20 +58,42 @@ class DictCache(AbstractCache):
         try:
             fname = func.__name__
         except:
-            LoggingManager.log("Unable to acquire function name.")
+            LoggingManager().log("Unable to acquire function name.",
+                                 LoggingLevel.WARNING)
             return func(args)
 
+        # Make sure the index column is consistent
+        args.reset_index(drop=True, inplace=True)
         argshash = self._hash_args(args)
-        if fname in self.cache and argshash in self.cache[fname]:
-            for input, output in self.cache[fname][argshash]:
-                if args.equals(input):
-                    return output
 
-        # No hit
-        retval = func(args)
-        if fname not in self.cache:
-            self.cache[fname] = {}
-        if argshash not in self.cache[fname]:
-            self.cache[fname][argshash] = []
-        self.cache[fname][argshash].append((args, retval))
+        # Check which cache should be used
+        if len(args.index) > 1:
+            cache = self.batchcache
+        else:
+            cache = self.rowcache
+
+        # Hit
+        hit, output = self._check(cache, fname, argshash, args)
+        if hit:
+            LoggingManager().log("Hit: %s, %s" % (fname, args),
+                                 LoggingLevel.INFO)
+            return output
+
+        if len(args.index) > 1:
+            # No batch hit
+            retval = pd.DataFrame()
+            for i in range(len(args.index)):
+                # df.iloc[[i]] gives back a dataframe
+                retval = retval.append(self.execute(func, args.iloc[[i]]), ignore_index=True)
+        else:
+            # No row hit
+            LoggingManager().log("Miss: %s, %s" % (fname, args),
+                                 LoggingLevel.INFO)
+            retval = func(args)
+
+        self._add(cache, fname, argshash, args, retval)
         return retval
+
+    def drop(self):
+        self.batchcache = {}
+        self.rowcache = {}
