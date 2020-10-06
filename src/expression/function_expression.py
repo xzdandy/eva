@@ -21,6 +21,7 @@ from src.executor.execution_context import Context
 from src.expression.abstract_expression import AbstractExpression, \
     ExpressionType
 from src.models.storage.batch import Batch
+from src.cache import Cache
 from src.udfs.gpu_compatible import GPUCompatible
 from src.catalog.models.udf_io import UdfIO
 
@@ -102,8 +103,9 @@ class FunctionExpression(AbstractExpression):
             new_batch = Batch.merge_column_wise(child_batches)
 
         func = self._gpu_enabled_function()
-        outcomes = func(new_batch.frames)
-        outcomes = Batch(pd.DataFrame(outcomes))
+        func.__name__ = self.name
+        outcomes = Cache.execute(func, new_batch.frames)
+        outcomes = Batch(outcomes)
 
         if self._output:
             return outcomes.project([self._output])

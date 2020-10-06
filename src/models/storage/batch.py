@@ -102,6 +102,12 @@ class Batch:
         return cls(frames=obj['frames'],
                    identifier_column=obj['identifier_column'])
 
+    def sort(self):
+        if self.identifier_column in self.frames:
+            self._frames = self._frames.sort_values(
+                by=[self.identifier_column],
+                ignore_index=True)
+
     def __str__(self):
         """
         For debug propose

@@ -14,6 +14,7 @@
 # limitations under the License.
 import numpy as np
 import pandas as pd
+import time
 import cv2
 import os
 
@@ -69,7 +70,7 @@ def create_sample_video(num_frames=NUM_FRAMES):
                           cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 10,
                           (2, 2))
     for i in range(num_frames):
-        frame = np.array(np.ones((2, 2, 3)) * float(i + 1) * 25,
+        frame = np.array(np.ones((2, 2, 3)) * (i + 1) * 25,
                          dtype=np.uint8)
         out.write(frame)
 
@@ -82,7 +83,7 @@ def create_dummy_batches(num_frames=NUM_FRAMES,
     for i in filters:
         data.append({'id': i + start_id,
                      'data': np.array(
-                         np.ones((2, 2, 3)) * float(i + 1) * 25,
+                         np.ones((2, 2, 3)) * (i + 1) * 25,
                          dtype=np.uint8)})
 
         if len(data) % batch_size == 0:
@@ -97,7 +98,6 @@ def perform_query(query):
     l_plan = StatementToPlanConvertor().visit(stmt)
     p_plan = PlanGenerator().build(l_plan)
     return PlanExecutor(p_plan).execute_plan()
-
 
 class DummyObjectDetector(AbstractClassifierUDF):
 
@@ -125,4 +125,65 @@ class DummyObjectDetector(AbstractClassifierUDF):
         # odd are labeled bicycle and even person
         i = int(frames[0][0][0][0] * 25) - 1
         label = self.labels[i % 2 + 1]
+        return label
+
+class DummyLabelDetector(AbstractClassifierUDF):
+
+    @property
+    def name(self) -> str:
+        return "dummyLabelDetector"
+
+    def __init__(self):
+        super().__init__()
+
+    @property
+    def input_format(self):
+        return FrameInfo(-1, -1, 3, ColorSpace.RGB)
+
+    @property
+    def labels(self):
+        return ['__background__', 'person', 'bicycle']
+
+    def classify(self, df: pd.DataFrame):
+        ret = pd.DataFrame()
+        ret['label'] = df.apply(self.classify_one, axis = 1)
+        return ret
+
+    def classify_one(self, frames: np.ndarray):
+        #time.sleep(5)
+        i = int(frames[0][0][0][0] * 25) - 1
+        label = self.labels[i % 3]
+        return label
+
+class DummyColorDetector(AbstractClassifierUDF):
+
+    @property
+    def name(self) -> str:
+        return "dummyColorDetector"
+
+    def __init__(self):
+        super().__init__()
+
+    @property
+    def input_format(self):
+        return FrameInfo(-1, -1, 3, ColorSpace.RGB)
+
+    @property
+    def labels(self):
+        return ['red', 'blue', 'green']
+
+    def classify(self, df: pd.DataFrame):
+        ret = pd.DataFrame()
+        ret['color'] = df.apply(self.classify_one, axis = 1)
+        return ret
+
+    def classify_one(self, frames: np.ndarray):
+        #time.sleep(5)
+        i = int(frames[0][0][0][0] / 25) - 1
+        if i < 3:
+            label = self.labels[0]
+        elif i < 6:
+            label = self.labels[1]
+        else:
+            label = self.labels[2]
         return label
