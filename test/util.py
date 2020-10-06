@@ -116,11 +116,16 @@ class DummyObjectDetector(AbstractClassifierUDF):
     def labels(self):
         return ['__background__', 'person', 'bicycle']
 
-    def classify(self, frames: pd.DataFrame):
+    def classify(self, df: pd.DataFrame):
+        ret = pd.DataFrame()
+        ret['label'] = df.apply(self.classify_one, axis=1)
+        return ret
+
+    def classify_one(self, frames: np.ndarray):
         # odd are labeled bicycle and even person
-        labels = [self.labels[i % 2 + 1] for i in range(len(frames))]
-        prediction_df_list = pd.DataFrame({'label': labels})
-        return prediction_df_list
+        i = int(frames[0][0][0][0] * 25) - 1
+        label = self.labels[i % 2 + 1]
+        return label
 
 class DummyLabelDetector(AbstractClassifierUDF):
 
