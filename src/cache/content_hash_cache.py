@@ -21,7 +21,7 @@ from src.cache.abstract_cache import AbstractCache
 from src.utils.logging_manager import LoggingLevel
 from src.utils.logging_manager import LoggingManager
 
-class DictCache(AbstractCache):
+class ContentHashCache(AbstractCache):
 
     """
     In memory cache based on Dictionary. For testing purpose only.
