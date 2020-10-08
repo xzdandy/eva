@@ -101,11 +101,11 @@ class FunctionExpression(AbstractExpression):
         child_batches = [child.evaluate(batch) for child in self.children]
         if len(child_batches):
             new_batch = Batch.merge_column_wise(child_batches)
+            new_batch.index_column = child_batches[0].index_column
 
         func = self._gpu_enabled_function()
-        #func.__name__ = self.name
-        #outcomes = Cache.execute(func, new_batch.frames)
-        outcomes = func(new_batch.frames)
+        func.__name__ = self.name
+        outcomes = Cache.execute(func, new_batch)
         outcomes = Batch(outcomes)
 
         if self._output:

@@ -71,7 +71,10 @@ class TupleValueExpression(AbstractExpression):
             # error Handling
             pass
 
-        return batch.project([self.col_name])
+        newbatch = batch.project([self.col_name])
+        if newbatch.index_column is not None:
+            newbatch.index_column.rename(self.col_name, inplace=True)
+        return newbatch
 
     def __eq__(self, other):
         is_subtree_equal = super().__eq__(other)

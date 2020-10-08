@@ -53,7 +53,8 @@ class Batch:
                  frames=pd.DataFrame(),
                  outcomes=None,
                  temp_outcomes=None,
-                 identifier_column='id'):
+                 identifier_column='id',
+                 index_column=None):
         super().__init__()
         if outcomes is None:
             outcomes = dict()
@@ -71,6 +72,7 @@ class Batch:
         self._outcomes = outcomes
         self._temp_outcomes = temp_outcomes
         self._identifier_column = identifier_column
+        self._index_column = index_column
 
     @property
     def frames(self):
@@ -79,6 +81,14 @@ class Batch:
     @property
     def batch_size(self):
         return self._batch_size
+
+    @property
+    def index_column(self):
+        return self._index_column
+
+    @index_column.setter
+    def index_column(self, val):
+        self._index_column = val
 
     def __len__(self):
         return self._batch_size
@@ -219,7 +229,7 @@ class Batch:
                                  Frames: %s" % (unknown_cols, self._frames),
                                  LoggingLevel.WARNING)
         return Batch(self._frames[verfied_cols], self._outcomes.copy(),
-                     self._temp_outcomes.copy(), self._identifier_column)
+                     self._temp_outcomes.copy(), self._identifier_column, self.index_column)
 
     @classmethod
     def merge_column_wise(cls,

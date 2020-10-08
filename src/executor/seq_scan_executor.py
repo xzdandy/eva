@@ -39,12 +39,16 @@ class SequentialScanExecutor(AbstractExecutor):
 
         child_executor = self.children[0]
         for batch in child_executor.exec():
+            old_index_name = batch.index_column.name
             # We do the predicate first
             if not batch.empty() and self.predicate is not None:
                 outcomes = self.predicate.evaluate(batch).frames
                 batch = Batch(
                     batch.frames[(outcomes > 0).to_numpy()].reset_index(
                         drop=True))
+                if 'id' in batch.frames:
+                    batch.index_column = batch.frames['id']
+                    batch.index_column.rename(old_index_name, inplace=True)
 
             # Then do project
             if not batch.empty() and self.project_expr is not None:

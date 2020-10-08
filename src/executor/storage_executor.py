@@ -28,4 +28,8 @@ class StorageExecutor(AbstractExecutor):
         pass
 
     def exec(self) -> Iterator[Batch]:
-        return StorageEngine.read(self.node.video)
+        for batch in StorageEngine.read(self.node.video):
+            if 'id' in batch.frames.columns:
+                batch.index_column = batch.frames['id']
+                batch.index_column.rename(self.node.video.name, inplace=True)
+            yield batch
