@@ -13,20 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import Callable
-from abc import ABCMeta, abstractmethod
+from src.cache.abstract_cache import AbstractCache
 from src.models.storage.batch import Batch
 
+class NoCache(AbstractCache):
 
-class AbstractCache(metaclass=ABCMeta):
+    """
+    No cache is enabled. Always execute the UDF.
+    """
+    def __init__(self):
+        pass
 
-    @abstractmethod
     def execute(self, func: Callable, args: Batch) -> Batch:
-        """
-            Execute the function with cache.
-        """
+        return Batch(func(args.frames))
 
-    @abstractmethod
     def drop(self):
-        """
-            Drop all existing cache content.
-        """
+        pass

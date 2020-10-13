@@ -106,7 +106,6 @@ class FunctionExpression(AbstractExpression):
         func = self._gpu_enabled_function()
         func.__name__ = self.name
         outcomes = Cache.execute(func, new_batch)
-        outcomes = Batch(outcomes)
 
         if self._output:
             return outcomes.project([self._output])
