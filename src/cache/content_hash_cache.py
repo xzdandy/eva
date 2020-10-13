@@ -77,6 +77,7 @@ class ContentHashCache(AbstractCache):
         # Hit
         hit, output = self._check(cache, fname, argshash, args)
         if hit:
+            print("Hit?")
             LoggingManager().log("Hit: %s, %s" % (fname, args),
                                  LoggingLevel.INFO)
             return Batch(output)
@@ -89,6 +90,7 @@ class ContentHashCache(AbstractCache):
                 retval = retval.append(self.execute(func, Batch(args.iloc[[i]])).frames, ignore_index=True)
         else:
             # No row hit
+            print("Miss?")
             LoggingManager().log("Miss: %s, %s" % (fname, args),
                                  LoggingLevel.INFO)
             retval = func(args)
