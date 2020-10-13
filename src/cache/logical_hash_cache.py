@@ -12,10 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import pandas as pd
-import numpy as np
-import hashlib
-
 from typing import Callable
 from src.cache.abstract_cache import AbstractCache
 from src.utils.logging_manager import LoggingLevel
@@ -31,7 +27,7 @@ class LogicalHashCache(AbstractCache):
         self.rowcache = {}
 
 
-    def execute(self, func: Callable, args: Batch) -> pd.DataFrame:
+    def execute(self, func: Callable, args: Batch) -> Batch:
         """
             Notice: args can be a dataframe with mutiple rows.
             Run with row by row?
@@ -41,7 +37,7 @@ class LogicalHashCache(AbstractCache):
         except:
             LoggingManager().log("Unable to acquire function name.",
                                  LoggingLevel.WARNING)
-            return func(args.frames)
+            return Batch(func(args.frames))
         bash_hash_key = '%s.%s' % (fname, args.index_column.name)
         print('bash_hash_key: %s' % bash_hash_key)
         outcome = []
@@ -55,7 +51,7 @@ class LogicalHashCache(AbstractCache):
                 retval = func(args.frames.iloc[[i]])
                 self.rowcache[key] = retval
                 outcome.append(retval)
-        return pd.concat(outcome, ignore_index=True)
+        return Batch(pd.concat(outcome, ignore_index=True))
 
 
     def drop(self):

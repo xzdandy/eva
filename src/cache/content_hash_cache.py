@@ -20,6 +20,7 @@ from typing import Callable
 from src.cache.abstract_cache import AbstractCache
 from src.utils.logging_manager import LoggingLevel
 from src.utils.logging_manager import LoggingManager
+from src.models.storage.batch import Batch
 
 class ContentHashCache(AbstractCache):
 
@@ -50,7 +51,7 @@ class ContentHashCache(AbstractCache):
                     return (True, output)
         return (False, None)
 
-    def execute(self, func: Callable, args: pd.DataFrame) -> pd.DataFrame:
+    def execute(self, func: Callable, args: Batch) -> Batch:
         """
             Notice: args can be a dataframe with mutiple rows.
             Run with row by row?
@@ -60,9 +61,10 @@ class ContentHashCache(AbstractCache):
         except:
             LoggingManager().log("Unable to acquire function name.",
                                  LoggingLevel.WARNING)
-            return func(args)
+            return Batch(func(args))
 
         # Make sure the index column is consistent
+        args = args.frames
         args.reset_index(drop=True, inplace=True)
         argshash = self._hash_args(args)
 
@@ -77,7 +79,7 @@ class ContentHashCache(AbstractCache):
         if hit:
             LoggingManager().log("Hit: %s, %s" % (fname, args),
                                  LoggingLevel.INFO)
-            return output
+            return Batch(output)
 
         if len(args.index) > 1:
             # No batch hit
@@ -92,7 +94,7 @@ class ContentHashCache(AbstractCache):
             retval = func(args)
 
         self._add(cache, fname, argshash, args, retval)
-        return retval
+        return Batch(retval)
 
     def drop(self):
         self.batchcache = {}
