@@ -7,7 +7,7 @@ executor:
   batch_size: 20
   gpu_batch_size: 1
   gpus: {'130.207.125.60': [1]}
-  cache: "src.cache.no_cache.NoCache"
+  cache: "src.cache.no_cache.NoCache"  
 
 storage:
   engine: "src.storage.petastorm_storage_engine.PetastormStorageEngine"

@@ -86,7 +86,7 @@ class ContentHashCache(AbstractCache):
             retval = pd.DataFrame()
             for i in range(len(args.index)):
                 # df.iloc[[i]] gives back a dataframe
-                retval = retval.append(self.execute(func, args.iloc[[i]]), ignore_index=True)
+                retval = retval.append(self.execute(func, Batch(args.iloc[[i]])).frames, ignore_index=True)
         else:
             # No row hit
             LoggingManager().log("Miss: %s, %s" % (fname, args),

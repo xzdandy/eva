@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import pandas as pd
+
 from typing import Callable
 from src.cache.abstract_cache import AbstractCache
 from src.utils.logging_manager import LoggingLevel
