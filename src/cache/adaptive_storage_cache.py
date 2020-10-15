@@ -39,6 +39,7 @@ class AdaptiveStorageCache(AbstractCache):
 
     def __init__(self):
         self.cache = {}
+        self.batched_write = {}
 
     def execute(self, func: Callable, args: Batch) -> Batch:
         """
@@ -64,6 +65,7 @@ class AdaptiveStorageCache(AbstractCache):
                 retval = func(args.frames.iloc[[i]])
                 self._write_cache(cache, table_meta, key, retval)
                 outcome.append(retval)
+        self._commit(table_meta)
         return Batch(pd.concat(outcome, ignore_index=True))
 
     def drop(self):
@@ -92,9 +94,11 @@ class AdaptiveStorageCache(AbstractCache):
                     self.cache[table_name][key] = value
         end_time = time.perf_counter()
 
+        if table_meta.name not in self.batched_write:
+            self.batched_write[table_meta.name] = []
+
         print('Load cache table for %s costs: %.4f' %
               (table_name, end_time-start_time))
-        print(self.cache[table_name])
         return self.cache[table_name], table_meta
 
     def _write_cache(self, cache: dict, table_meta: DataFrameMetadata,
@@ -105,9 +109,14 @@ class AdaptiveStorageCache(AbstractCache):
             LoggingManager().log('The output: %s is not JSON serializable'
                                  % value, LoggingLevel.WARNING)
             return
-        df = pd.DataFrame([{'key': key, 'value': json_str}])
-        StorageEngine.write(table_meta, Batch(df))
+        self.batched_write[table_meta.name].append(
+            {'key': key, 'value': json_str})
         cache[key] = json_str
+
+    def _commit(self, table_meta: DataFrameMetadata):
+        StorageEngine.write(table_meta, Batch(
+            pd.DataFrame(self.batched_write[table_meta.name])))
+        self.batched_write[table_meta.name] = []
 
     def _get_cache(self, cache: dict, key: str) -> pd.DataFrame:
         return pd.read_json(cache[key])
