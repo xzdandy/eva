@@ -55,8 +55,7 @@ class AdaptiveStorageCache(AbstractCache):
         cache, table_meta = self._load_cache_table(fname)
         outcome = []
         for i in range(len(args.frames)):
-            #key = '%s.%s' % (args.index_column.name, args.index_column[i])
-            key = args.index_column[i]
+            key = '%s.%s' % (args.index_column.name, args.index_column[i])
             if key in cache:
                 print('hit: %s' % key)
                 outcome.append(self._get_cache(cache, key))
@@ -87,13 +86,15 @@ class AdaptiveStorageCache(AbstractCache):
             self.cache[table_name] = {}
             for batch in StorageEngine.read(table_meta):
                 df = batch.frames
-                for key, value in zip(df['id'], df['data']):
+                for key, value in zip(df['key'], df['value']):
+                    key = key.decode()
+                    value = value.decode()
                     self.cache[table_name][key] = value
         end_time = time.perf_counter()
 
         print('Load cache table for %s costs: %.4f' %
               (table_name, end_time-start_time))
-
+        print(self.cache[table_name])
         return self.cache[table_name], table_meta
 
     def _write_cache(self, cache: dict, table_meta: DataFrameMetadata,
@@ -104,7 +105,7 @@ class AdaptiveStorageCache(AbstractCache):
             LoggingManager().log('The output: %s is not JSON serializable'
                                  % value, LoggingLevel.WARNING)
             return
-        df = pd.DataFrame([{'id': key, 'data': json_str}])
+        df = pd.DataFrame([{'key': key, 'value': json_str}])
         StorageEngine.write(table_meta, Batch(df))
         cache[key] = json_str
 
@@ -123,13 +124,13 @@ class AdaptiveStorageCache(AbstractCache):
         Here we build a key-value store in StorageEngine
         """
         catalog = CatalogManager()
-        columns = [ColumnDefinition('id', ParserColumnDataType.INTEGER, [],
+        columns = [ColumnDefinition('key', ParserColumnDataType.TEXT, [],
                                     ColConstraintInfo(unique=True))]
-        columns.append(ColumnDefinition('data', ParserColumnDataType.TEXT, []))
+        columns.append(ColumnDefinition('value', ParserColumnDataType.TEXT, []))
         col_metadata = create_column_metadata(columns)
         uri = str(generate_file_path(table_name))
         metadata = catalog.create_metadata(table_name, uri, col_metadata,
-                                           identifier_column='id')
+                                           identifier_column='key')
         return metadata
 
 
