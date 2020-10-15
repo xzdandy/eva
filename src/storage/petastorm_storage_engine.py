@@ -72,7 +72,6 @@ class PetastormStorageEngine(AbstractStorageEngine):
             return
         # ToDo
         # Throw an error if the row schema doesn't match the table schema
-
         with materialize_dataset(self.spark_session,
                                  self._spark_url(table),
                                  table.schema.petastorm_schema):

@@ -28,7 +28,9 @@ NUM_FRAMES = 10
 
 class UDFCacheTest(unittest.TestCase):
 
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
+        super(UDFCacheTest, cls).setUpClass()
         CatalogManager().reset()
         create_sample_video(NUM_FRAMES)
 
@@ -51,7 +53,8 @@ class UDFCacheTest(unittest.TestCase):
         """
         perform_query(create_udf_query)
 
-    def tearDown(self):
+    @classmethod
+    def tearDownClass(cls):
         os.remove('dummy.avi')
 
     def perform_query_with_time(self, query):
