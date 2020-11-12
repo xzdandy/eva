@@ -39,14 +39,18 @@ class SequentialScanExecutor(AbstractExecutor):
 
         child_executor = self.children[0]
         for batch in child_executor.exec():
-            old_index_name = batch.index_column.name
+            try:
+                old_index_name = batch.index_column.name
+            except:
+                # Need fix for nested queries
+                old_index_name = None
             # We do the predicate first
             if not batch.empty() and self.predicate is not None:
                 outcomes = self.predicate.evaluate(batch).frames
                 batch = Batch(
                     batch.frames[(outcomes > 0).to_numpy()].reset_index(
                         drop=True))
-                if 'id' in batch.frames:
+                if old_index_name is not None and 'id' in batch.frames:
                     batch.index_column = batch.frames['id']
                     batch.index_column.rename(old_index_name, inplace=True)
 
