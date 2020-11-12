@@ -22,6 +22,7 @@ from src.models.storage.batch import Batch
 from test.util import create_sample_video, perform_query
 from test.util import DummyLabelDetector, DummyColorDetector
 from src.cache import Cache
+from src.storage.storage_engine import StorageEngine
 
 NUM_FRAMES = 10
 
@@ -56,6 +57,10 @@ class UDFCacheTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         os.remove('dummy.avi')
+        StorageEngine.close()
+
+    def tearDown(self):
+        time.sleep(1)
 
     def perform_query_with_time(self, query):
         start_time = time.time()

@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import threading
+
 from src.spark.session import Session
 from src.catalog.models.df_metadata import DataFrameMetadata
 from petastorm.etl.dataset_metadata import materialize_dataset
@@ -26,6 +28,7 @@ from typing import Iterator, List
 from pathlib import Path
 
 
+
 class PetastormStorageEngine(AbstractStorageEngine):
 
     def __init__(self):
@@ -35,6 +38,28 @@ class PetastormStorageEngine(AbstractStorageEngine):
         self._spark = Session()
         self.spark_session = self._spark.get_session()
         self.spark_context = self._spark.get_context()
+        self.condition = threading.Condition()
+        self.tasks = []
+        self.stopped = False
+        self.thread = threading.Thread(target=self._write_acync_thread)
+        self.thread.start()
+        # TODO: thread cleanup
+
+    def _write_acync_thread(self):
+        """
+        The background loof waiting for the writing tasks.
+        """
+        while not self.stopped or len(self.tasks) > 0:
+            with self.condition:
+                while not self.stopped and len(self.tasks) == 0:
+                    self.condition.wait()
+                if len(self.tasks) > 0:
+                    task = self.tasks.pop(0)
+                else:
+                    task = None
+            if task:
+                self.write(*task)
+
 
     def _spark_url(self, table: DataFrameMetadata) -> str:
         """
@@ -58,6 +83,15 @@ class PetastormStorageEngine(AbstractStorageEngine):
                 .write \
                 .mode('overwrite') \
                 .parquet(self._spark_url(table))
+
+    def write_async(self, table: DataFrameMetadata, rows: Batch):
+        """
+        Push the write task into the background thread.
+        """
+        with self.condition:
+            self.tasks.append((table, rows))
+            self.condition.notify()
+
 
     def write(self, table: DataFrameMetadata, rows: Batch):
         """
@@ -114,6 +148,12 @@ class PetastormStorageEngine(AbstractStorageEngine):
             self._spark_url(table), predicate=predicate)
         for batch in petastorm_reader.read():
             yield batch
+
+    def close(self):
+        with self.condition:
+            self.stopped = True
+            self.condition.notify()
+        self.thread.join()
 
     def _open(self, table):
         pass

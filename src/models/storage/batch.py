@@ -118,6 +118,13 @@ class Batch:
                 by=[self.identifier_column],
                 ignore_index=True)
 
+    def copy(self, deep=True) -> 'Batch':
+        return Batch(self.frames.copy(deep),
+                     self.outcomes,
+                     self.temp_outcomes,
+                     self.identifier_column,
+                     self.index_column)
+
     def __str__(self):
         """
         For debug propose

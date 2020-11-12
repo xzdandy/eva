@@ -24,7 +24,7 @@ from src.parser.create_statement import ColumnDefinition, \
     ColConstraintInfo
 from src.utils.generic_utils import generate_file_path
 from src.catalog.column_type import ColumnType
-from src.storage import StorageEngine
+from src.storage.storage_engine import StorageEngine
 from src.parser.types import ParserColumnDataType
 
 from src.utils.logging_manager import LoggingLevel
@@ -114,7 +114,7 @@ class AdaptiveStorageCache(AbstractCache):
         cache[key] = json_str
 
     def _commit(self, table_meta: DataFrameMetadata):
-        StorageEngine.write(table_meta, Batch(
+        StorageEngine.write_async(table_meta, Batch(
             pd.DataFrame(self.batched_write[table_meta.name])))
         self.batched_write[table_meta.name] = []
 
